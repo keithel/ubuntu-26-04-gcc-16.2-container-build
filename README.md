@@ -14,14 +14,19 @@ released compiler. Only C and C++ are built.
 
     ./build.sh
 
-This builds the `gcc-builder` image, then runs it with two host directories mounted:
+This builds the `gcc-builder` image, then runs it with `gcc-build/` mounted as `/work`
+(`src/` = source + build tree, `out/` = results: the `.deb` files and `build.log`).
 
-| Host dir     | Container path             | Purpose                                              |
-|--------------|----------------------------|------------------------------------------------------|
-| `gcc-build/` | `/work`                    | `src/` = source + build tree, `out/` = results       |
-| `apt-cache/` | `/var/cache/apt/archives`  | Keeps downloaded `.deb`s so re-runs don't re-download |
+### Debugging / repeated runs: keep the apt cache
 
-Results land in `gcc-build/out/`: the `.deb` files and `build.log`.
+By default nothing is cached on the host. If you are iterating and re-running the
+build, avoid re-downloading ~400 packages each time:
+
+    KEEP_APT_CACHE=1 ./build.sh
+
+This additionally mounts `apt-cache/` at `/var/cache/apt/archives` and disables the base
+image's `docker-clean` hook (at run time, so no image rebuild is needed). Delete
+`apt-cache/` (root-owned; use `sudo`) when done.
 
 What the build does (`scripts/build-gcc.sh`):
 
@@ -31,13 +36,13 @@ What the build does (`scripts/build-gcc.sh`):
    `lang=` is the packaging's own language switch; the test suite is skipped.
 
 Settings can be overridden with environment variables (add `-e VAR=value` to the
-`docker run` in `build.sh`): `LANGS` (default `c,c++`), `GCC_PKG` (default `gcc-16`).
+`docker run` in `build.sh`; `KEEP_APT_CACHE` is already passed through): `LANGS` (default `c,c++`), `GCC_PKG` (default `gcc-16`).
 
 Notes:
 - The container writes files as root, so `gcc-build/` contents are root-owned;
   use `sudo` to delete them.
-- The apt cache works because the Dockerfile removes the base image's
-  `/etc/apt/apt.conf.d/docker-clean`, which otherwise deletes every `.deb` after install.
+- The apt cache needs `KEEP_APT_CACHE=1` because the base image's
+  `/etc/apt/apt.conf.d/docker-clean` otherwise deletes every `.deb` after install.
 - Don't run two builds at once; they share the apt cache lock.
 
 ## Install
@@ -84,8 +89,8 @@ Programs built with this compiler use the **system** `libstdc++`/`libgcc_s`
 
 ## Layout
 
-    Dockerfile            build image (Ubuntu 26.04 + apt cache fix)
+    Dockerfile            build image (stock Ubuntu 26.04)
     build.sh              builds the image and runs the build
     scripts/build-gcc.sh  runs inside the container
-    apt-cache/            host-side apt package cache (git-ignored)
+    apt-cache/            optional host-side apt cache, KEEP_APT_CACHE=1 only (git-ignored)
     gcc-build/            host-side sources and output (git-ignored)

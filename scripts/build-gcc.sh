@@ -4,6 +4,15 @@ set -euo pipefail
 
 GCC_PKG=${GCC_PKG:-gcc-16}
 LANGS=${LANGS:-c,c++}
+KEEP_APT_CACHE=${KEEP_APT_CACHE:-0}
+
+# Optional: keep downloaded .debs in /var/cache/apt/archives (bind-mounted by
+# build.sh). The base image's docker-clean hook would otherwise delete them.
+if [ "$KEEP_APT_CACHE" = 1 ]; then
+  rm -f /etc/apt/apt.conf.d/docker-clean
+  echo 'APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/01keep-debs
+fi
+
 RELEASE=$(. /etc/os-release && echo "$VERSION_CODENAME")
 
 # Enable deb-src for the main ubuntu sources (deb822 on 24.04+, classic otherwise).
